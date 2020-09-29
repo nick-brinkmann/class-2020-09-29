@@ -18,12 +18,42 @@ Let's continue working with enrollment data. I have downloaded 5 years of fall e
 **Prompt:** Write a pipe which creates an object named `d_2019` by reading in and cleaning up the data from Fall 2019. (You will need to examine the file names to determine which file this is.) You may consult and re-use the code from last week. The variable names in the tibble should be `id`,  `title`, `name`, `department` and `u_grad`. Keep only classes with more than 10 undergrads enrolled.
 
 
+```{r scene_1}
+d_2019 <- 
+  read_excel("raw_data/class_enrollment_summary_by_term_12.20.19.xlsx", 
+             skip = 3) %>% 
+  clean_names() %>% 
+  filter(!is.na(course_title)) %>% 
+  select( -instructor_full_name, -course_section_code, -(grad:total)) %>%
+  rename_with(~ str_replace(.x, "course_", "")) %>% 
+  group_by(id, title, name, department) %>% 
+  summarize(u_grad = sum(u_grad), .groups = "drop") %>% 
+  filter(u_grad > 10)
+
+d_2019
+```
+
 
 
 ### Scene 2
 
 **Prompt:** We could copy/paste this code 5 times, adjust the files names, and then read in each file. But, as you know from Chapter 4, that is a bad idea. It also scales very poorly. Create a function called `read_enrollent` which takes one argument, `file`. Use that function to read in the data from fall 2019 and assign it to an object called `d_2019_take_2`. Do you get the same answer as you did in Scene 1?
 
+```{r scene_2}
+read_enrollment <- function(file, start){
+  read_excel(file, 
+             skip = start) %>% 
+  clean_names() %>% 
+  filter(!is.na(course_title)) %>% 
+  select( -instructor_full_name, -course_section_code, -(grad:total)) %>%
+  rename_with(~ str_replace(.x, "course_", "")) %>% 
+  group_by(id, title, name, department) %>% 
+  summarize(u_grad = sum(u_grad), .groups = "drop") %>% 
+  filter(u_grad > 10)
+}
+
+d_2019_take_2 <- read_enrollment(file = "raw_data/class_enrollment_summary_by_term_12.20.19.xlsx", start = 3)
+```
 
 
 ### Scene 3
@@ -32,16 +62,54 @@ Let's continue working with enrollment data. I have downloaded 5 years of fall e
 
 Arrg! Depending in how you wrote `read_enrollment()`, you will probably be getting an error, for at least some of the years.  How annoying that Harvard changes the format! Make your function flexible enough to deal with all these files. Hint: You need to add at least one argument in addition to `file` so that you can change the behavior of the function when you call it. Give that new argument a sensible default.
 
+```{r scene_3}
+d_2019 <- read_enrollment(file = "raw_data/class_enrollment_summary_by_term_12.20.19.xlsx", start = 3)
+d_2018 <- read_enrollment(file = "raw_data/class_enrollment_summary_by_term_10.24.18.xlsx", start = 2)
+d_2017 <- read_enrollment(file = "raw_data/class_enrollment_summary_by_term_10.20.17.xlsx", start = 3)
+d_2016 <- read_enrollment(file = "raw_data/class_enrollment_summary_by_term_fall_2016.xlsx", start = 0)
+d_2015 <- read_enrollment(file = "raw_data/class_enrollment_summary_by_term_fall_2015.xlsx", start = 3)
+
+d_2019
+d_2018
+d_2017
+d_2016
+d_2015
+```
+
 
 ### Scene 4
 
 **Prompt:** Combine the five tibbles which you have into a single tibble which can then be used for analysis and graphics. There are many ways to do this, but we recommend `bind_rows()`. Hint: make use of the `.id` argument, which may be aided by placing the tibbles in a list.
 
+```{r}
+all <- bind_rows(d_2015, d_2016, d_2017, d_2018, d_2019, .id = "year") %>%
+  mutate(year = as.integer(year) + 2014)
+
+# ID's originally 1, 2, 3, 4, 5. We want 2015, 2016, 2017, 2018, 2019. So add 2014 to each year. ID column was originally a character vector. Use as.integer()
+
+all
+```
 
 
 ### Scene 5
 
 **Prompt:** Make an interesting plot with this data. Take that plot and publish it on Rpubs. Add a link to the Rpubs in the #general Slack channel.
+
+```{r scene_5}
+course_list_2019 <- all %>%
+  filter(year == 2019 & u_grad > 250)
+
+course_names <- course_list_2019$title
+
+course_names
+
+all %>%
+  filter(title %in% course_names) %>%
+  ggplot(aes(x = year, y = u_grad)) +
+  geom_col() +
+  facet_wrap(~ title) +
+  labs(title = "Changes in Enrollment in Large Harvard Courses In Last 5 Years", y = "Enrollment")
+```
 
 
 
